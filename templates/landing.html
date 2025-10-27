@@ -1,0 +1,141 @@
+<!-- Save this as templates/landing.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Amazon Alexa Review Sentiment</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #e0f7fa, #f8bbd0);
+      min-height: 100vh;
+    }
+
+    .top-wave {
+      position: absolute;
+      top: 0;
+      width: 100%;
+      height: 100px;
+      overflow: hidden;
+      line-height: 0;
+    }
+
+    .top-wave svg {
+      position: relative;
+      display: block;
+      width: calc(133% + 1.3px);
+      height: 100px;
+    }
+
+    .top-wave .shape-fill {
+      fill: #ffffff;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-900 relative">
+
+  <div class="top-wave">
+    <svg viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path d="M0,0V46.29c47.74,22,106.27,29.05,158,15.94C230.76,49,284.8,17.4,339,11.75c54.75-5.73,110.28,16.79,164,31.91C611.47,64.29,667,73.05,720,58.82c48.81-12.75,96.27-45.94,143-58.81,52.92-14.4,106.18,1.21,158,15.94V0Z" class="shape-fill"></path>
+    </svg>
+  </div>
+
+  <div class="container mx-auto px-4 py-20">
+    <h1 class="text-4xl font-bold text-center mb-10 text-gray-800 drop-shadow-md">Text Sentiment Predictor</h1>
+
+    <form id="predictionForm" class="max-w-xl mx-auto bg-white p-6 rounded-xl shadow-lg backdrop-blur-md">
+      <label class="block mb-2 text-sm font-medium text-gray-700">Upload CSV File:</label>
+      <input type="file" id="csvFileInput" accept=".csv" title="Upload CSV File" placeholder="Choose CSV file"
+             class="block w-full border border-gray-300 p-2 rounded mb-4"/>
+
+      <label class="block mb-2 text-sm font-medium text-gray-700">Or enter a sentence:</label>
+      <textarea id="textInput" placeholder="Enter text..." rows="4"
+        class="w-full border border-gray-300 p-2 rounded mb-4"></textarea>
+
+      <button type="button" onclick="predict()"
+        class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded hover:bg-blue-700 transition duration-200">
+        Predict
+      </button>
+
+      <button id="downloadBtn" type="button"
+        class="w-full mt-3 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 hidden transition duration-200">
+        Download Predictions
+      </button>
+    </form>
+
+    <div class="max-w-xl mx-auto mt-6">
+      <div id="predictionResult" class="text-xl font-medium text-center text-blue-800"></div>
+      <div id="graphContainer" class="mt-4 flex justify-center"></div>
+    </div>
+  </div>
+
+  <script>
+    function predict() {
+      const csvFileInput = document.getElementById("csvFileInput");
+      const textInput = document.getElementById("textInput");
+      const predictionResult = document.getElementById("predictionResult");
+      const graphContainer = document.getElementById("graphContainer");
+
+      if (csvFileInput.files.length > 0) {
+        const formData = new FormData();
+        formData.append("file", csvFileInput.files[0]);
+
+        fetch("http://127.0.0.1:5000/predict", {
+          method: "POST",
+          body: formData
+        })
+        .then(response => {
+          if (response.headers.get("X-Graph-Exists") === "true") {
+            const graphData = response.headers.get("X-Graph-Data");
+            displayGraph(graphData);
+          }
+          return response.blob();
+        })
+        .then(blob => {
+          const downloadBtn = document.getElementById("downloadBtn");
+          downloadBtn.style.display = "block";
+          downloadBtn.onclick = () => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "Predictions.csv";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          };
+        })
+        .catch(err => {
+          console.error("Error:", err);
+          predictionResult.innerText = "Error occurred during bulk prediction.";
+        });
+
+      } else if (textInput.value.trim() !== "") {
+        fetch("http://127.0.0.1:5000/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text: textInput.value.trim() })
+        })
+        .then(response => response.json())
+        .then(data => {
+          predictionResult.innerText = "Prediction: " + data.prediction;
+        })
+        .catch(err => {
+          console.error("Error:", err);
+          predictionResult.innerText = "Error occurred during prediction.";
+        });
+      }
+    }
+
+    function displayGraph(graphData) {
+      const graphContainer = document.getElementById("graphContainer");
+      const img = document.createElement("img");
+      img.src = "data:image/png;base64," + graphData;
+      graphContainer.innerHTML = "";
+      graphContainer.appendChild(img);
+    }
+  </script>
+</body>
+</html>

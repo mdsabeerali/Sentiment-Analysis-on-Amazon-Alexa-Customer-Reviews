@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sentiment Prediction</title>
+</head>
+<body>
+  <h1>Text Sentiment Prediction</h1>
+
+  <form id="predictionForm">
+    <label>Upload CSV:</label><br>
+    <input type="file" id="csvFileInput" accept=".csv" title="Upload a CSV file" placeholder="Choose CSV file"><br><br>
+
+    <label>Or Enter Text:</label><br>
+    <textarea id="textInput" rows="4" cols="50" placeholder="Enter text..."></textarea><br><br>
+
+    <button type="button" onclick="predict()">Predict</button>
+    <button id="downloadBtn" style="display:none">Download Predictions</button>
+  </form>
+
+  <div id="predictionResult"></div>
+  <div id="graphContainer"></div>
+
+  <script>
+    function predict() {
+      var csvFileInput = document.getElementById("csvFileInput");
+      var textInput = document.getElementById("textInput");
+      var predictionResult = document.getElementById("predictionResult");
+      var graphContainer = document.getElementById("graphContainer");
+
+      if (csvFileInput.files.length > 0) {
+        var formData = new FormData();
+        formData.append("file", csvFileInput.files[0]);
+
+        fetch("http://localhost:5000/predict", {
+          method: "POST",
+          body: formData
+        })
+        .then(response => {
+          if (response.headers.get('X-Graph-Exists') === 'true') {
+            const graphData = response.headers.get('X-Graph-Data');
+            displayGraph(graphData);
+          }
+          return response.blob();
+        })
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "Predictions.csv";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        })
+        .catch(err => {
+          console.error("Error:", err);
+          predictionResult.innerText = "Error occurred.";
+        });
+
+      } else if (textInput.value.trim() !== "") {
+        fetch("http://localhost:5000/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text: textInput.value.trim() })
+        })
+        .then(response => response.json())
+        .then(data => {
+          predictionResult.innerText = "Prediction: " + data.prediction;
+        })
+        .catch(err => {
+          console.error("Error:", err);
+          predictionResult.innerText = "Error occurred.";
+        });
+      }
+    }
+
+    function displayGraph(graphData) {
+      var img = document.createElement("img");
+      img.src = "data:image/png;base64," + graphData;
+      const container = document.getElementById("graphContainer");
+      container.innerHTML = "";
+      container.appendChild(img);
+    }
+  </script>
+</body>
+</html>
